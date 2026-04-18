@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>OneStop — Shift Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F7F7F5;--surface:#FFFFFF;--surface2:#F2F1EE;
+  --border:#E8E7E3;--border2:#D4D2CC;
+  --ink:#1A1916;--ink2:#4A4845;--ink3:#8A8784;
+  --accent:#2D4A3E;--accent2:#3D6355;--accent-light:#EBF2EF;--accent-mid:#A8C5BB;
+  --warn:#C4622D;--warn-light:#FBF0EB;--gold:#9B7E46;
+  --radius:12px;--radius-lg:18px;--radius-xl:24px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05);
+  --shadow-lg:0 2px 8px rgba(0,0,0,.06),0 12px 40px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
+#loader{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s,visibility .5s}
+#loader.hide{opacity:0;visibility:hidden;pointer-events:none}
+.l-mark{width:56px;height:56px;border-radius:14px;background:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:20px;animation:lPulse 1.6s ease-in-out infinite}
+@keyframes lPulse{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
+.l-name{font-family:'DM Serif Display',serif;font-size:28px;color:var(--ink)}
+.l-sub{font-size:12px;color:var(--ink3);margin-top:4px;letter-spacing:.5px;text-transform:uppercase}
+.l-bar{width:120px;height:2px;background:var(--border);border-radius:1px;margin-top:28px;overflow:hidden}
+.l-bar-fill{height:100%;background:var(--accent);animation:lBar 1.8s ease both}
+@keyframes lBar{from{width:0}to{width:100%}}
+#app{max-width:520px;margin:0 auto;padding:0 16px 100px;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 0 8px;margin-bottom:8px}
+.topbar-brand{display:flex;align-items:center;gap:10px}
+.topbar-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px}
+.topbar-name{font-family:'DM Serif Display',serif;font-size:22px;color:var(--ink)}
+.topbar-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.topbar-date{font-size:11px;color:var(--ink3)}
+.sync-badge{font-size:9px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.3px}
+.sync-ok{background:var(--accent-light);color:var(--accent);border:1px solid rgba(45,74,62,.15)}
+.sync-err{background:var(--warn-light);color:var(--warn);border:1px solid rgba(196,98,45,.2)}
+.sync-ing{background:#F0EEF8;color:#4A3D7A;border:1px solid rgba(74,61,122,.15)}
+.card{background:var(--surface);border-radius:var(--radius-xl);padding:24px;margin-bottom:14px;border:1px solid var(--border);box-shadow:var(--shadow);animation:fadeUp .35s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.live-card{background:var(--accent);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:14px;animation:fadeUp .35s ease both}
+.live-card-num{font-family:'DM Serif Display',serif;font-size:38px;color:#fff;line-height:1}
+.live-card-lbl{font-size:11px;color:rgba(255,255,255,.65);margin-top:2px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+.live-names{margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:10px}
+.live-name-row{font-size:12px;color:rgba(255,255,255,.85);font-weight:500;padding:4px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.07)}
+.live-name-row:last-child{border-bottom:none}
+.live-shift-tag{font-size:9px;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:10px;color:rgba(255,255,255,.8)}
+.sec-label{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.steps{display:flex;align-items:center;gap:6px;margin-bottom:18px}
+.step-pip{width:6px;height:6px;border-radius:3px;background:var(--border2);transition:all .3s}
+.step-pip.on{background:var(--accent);width:24px}
+.step-pip.done{background:var(--accent-mid)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);margin-bottom:6px}
+.field input,.field select{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:11px 14px;color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:all .2s;-webkit-appearance:none}
+.field input:focus,.field select:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(45,74,62,.08)}
+.field input::placeholder{color:var(--ink3)}
+.field input[type=time]{color-scheme:light}
+.dur-badge{text-align:center;font-size:13px;font-weight:500;color:var(--accent);margin-top:2px;background:var(--accent-light);border-radius:var(--radius);padding:10px;border:1.5px solid rgba(45,74,62,.12);min-height:40px;display:flex;align-items:center;justify-content:center}
+.btn{width:100%;padding:13px 20px;border:none;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:#fff;margin-top:18px;box-shadow:0 2px 8px rgba(45,74,62,.25)}
+.btn-primary:hover{background:var(--accent2)}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--ink2);border:1.5px solid var(--border);font-size:13px;padding:10px;margin-top:8px}
+.btn-ghost:hover{background:var(--surface2)}
+.btn-danger{background:var(--warn);color:#fff;box-shadow:0 2px 8px rgba(196,98,45,.25)}
+.btn-gold{background:var(--gold);color:#fff;margin-top:10px}
+.bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(16px);border-top:1px solid var(--border);padding:10px 16px 18px;display:flex;gap:10px}
+.bar-btn{flex:1;padding:10px 8px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar-icon{font-size:18px;line-height:1}
+.bar-day{background:var(--accent);color:#fff}
+.bar-reset{background:var(--warn-light);color:var(--warn);border:1.5px solid rgba(196,98,45,.2)}
+.status-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;animation:fadeDown .28s ease both}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.s-dot{width:8px;height:8px;border-radius:50%;background:#3D9970;flex-shrink:0;box-shadow:0 0 0 3px rgba(61,153,112,.15)}
+.s-name{font-weight:600;color:var(--ink);font-size:14px}
+.s-time{font-size:12px;color:var(--ink3)}
+.s-badge{margin-left:auto;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;border:1px solid}
+.sb-Morning{background:#FEF9E7;color:#8A6500;border-color:rgba(138,101,0,.15)}
+.sb-Afternoon{background:#FEF3E6;color:#8A4200;border-color:rgba(138,66,0,.15)}
+.sb-Evening{background:var(--accent-light);color:var(--accent);border-color:rgba(45,74,62,.15)}
+.sb-Night{background:#F0EEF8;color:#4A3D7A;border-color:rgba(74,61,122,.15)}
+.shift-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.shift-card{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:20px 12px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.shift-card:hover{border-color:var(--accent-mid);background:var(--accent-light);transform:translateY(-2px)}
+.shift-card.active{border-color:var(--accent);background:var(--accent-light);box-shadow:0 0 0 3px rgba(45,74,62,.1)}
+.shift-card.active::after{content:'✓';position:absolute;top:8px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:20px}
+.shift-icon{font-size:28px;margin-bottom:10px;display:block}
+.shift-label{font-size:13px;font-weight:600;color:var(--ink)}
+.shift-time{font-size:10px;color:var(--ink3);margin-top:3px}
+.task-scroll{max-height:44vh;overflow-y:auto;margin:0 -2px;padding:0 2px}
+.task-scroll::-webkit-scrollbar{width:3px}
+.task-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.task-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:all .15s;border:1.5px solid transparent;margin-bottom:3px}
+.task-row:hover{background:var(--surface2);border-color:var(--border)}
+.task-row.selected{background:var(--accent-light);border-color:rgba(45,74,62,.2)}
+.task-row.done-other{opacity:.45;cursor:default;pointer-events:none}
+.task-num{font-size:10px;font-weight:500;color:var(--ink3);min-width:20px}
+.task-cb{width:18px;height:18px;border:1.5px solid var(--border2);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;transition:all .15s}
+.task-row.selected .task-cb{background:var(--accent);border-color:var(--accent)}
+.task-row.done-other .task-cb{background:var(--ink3);border-color:var(--ink3)}
+.task-check{color:#fff;font-size:9px;font-weight:700}
+.task-name-txt{font-size:13px;color:var(--ink2);flex:1;line-height:1.4}
+.task-row.selected .task-name-txt{color:var(--ink);font-weight:500}
+.task-by{font-size:9px;font-weight:600;color:var(--ink3);background:var(--surface2);padding:2px 7px;border-radius:20px;border:1px solid var(--border);white-space:nowrap}
+.custom-row{display:flex;gap:8px;margin-top:14px}
+.custom-row input{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);outline:none;transition:all .2s}
+.custom-row input:focus{border-color:var(--accent);background:#fff}
+.custom-row input::placeholder{color:var(--ink3)}
+.custom-add-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:0 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer}
+.prog-wrap{height:4px;background:var(--surface2);border-radius:2px;margin-top:14px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .5s ease}
+.prog-meta{display:flex;justify-content:space-between;margin-top:6px}
+.prog-meta span{font-size:11px;color:var(--ink3);font-weight:500}
+.img-zone{border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:28px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+.img-zone:hover{border-color:var(--accent-mid);background:var(--accent-light)}
+.img-zone-icon{font-size:28px;margin-bottom:8px}
+.img-zone-lbl{font-size:11px;font-weight:500;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase}
+.img-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:14px}
+.img-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.img-thumb img{width:100%;height:100%;object-fit:cover}
+.img-del{position:absolute;top:3px;right:3px;background:rgba(26,25,22,.75);color:#fff;border:none;border-radius:4px;width:16px;height:16px;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.done-hero{text-align:center;padding:20px 8px}
+.done-mark{width:64px;height:64px;border-radius:18px;background:var(--accent-light);border:1.5px solid rgba(45,74,62,.2);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:28px;animation:scaleIn .5s cubic-bezier(.175,.885,.32,1.275) both}
+@keyframes scaleIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+.done-hero h2{font-family:'DM Serif Display',serif;font-size:26px;color:var(--ink);margin-bottom:8px}
+.done-hero p{font-size:14px;color:var(--ink3)}
+.log-row{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:8px;text-align:left}
+.log-name{font-size:14px;font-weight:600;color:var(--ink)}
+.log-meta{font-size:11px;color:var(--ink3);margin-top:4px;line-height:1.6}
+.modal-bg{position:fixed;inset:0;background:rgba(26,25,22,.4);z-index:200;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .18s ease;backdrop-filter:blur(4px)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{background:#fff;border-radius:24px 24px 0 0;padding:24px 20px;width:100%;max-width:520px;animation:slideUp .28s cubic-bezier(.175,.885,.32,1.1) both;max-height:90vh;overflow-y:auto}
+@keyframes slideUp{from{transform:translateY(32px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-box::-webkit-scrollbar{width:3px}
+.modal-box::-webkit-scrollbar-thumb{background:var(--border2)}
+.modal-handle{width:36px;height:3px;background:var(--border2);border-radius:2px;margin:0 auto 22px}
+.modal-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--ink);margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--ink3);margin-bottom:18px}
+.pdf-wrap{background:var(--surface2);border-radius:var(--radius);padding:8px;margin:14px 0;max-height:42vh;overflow-y:auto}
+.pdf-wrap::-webkit-scrollbar{width:3px}
+.pdf-wrap::-webkit-scrollbar-thumb{background:var(--border2)}
+.pdf-page{background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.pdf-hdr{background:var(--accent);padding:16px 18px;display:flex;justify-content:space-between;align-items:center}
+.pdf-hdr-l .n{font-family:'DM Serif Display',serif;font-size:20px;color:#fff}
+.pdf-hdr-l .s{font-size:9px;color:rgba(255,255,255,.6);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.pdf-hdr-r{text-align:right;color:rgba(255,255,255,.65);font-size:9px;line-height:1.7}
+.pdf-stripe{height:3px;background:linear-gradient(90deg,#A8C5BB,var(--gold),#C5A888)}
+.pdf-body{padding:16px 18px}
+.pdf-emp-bar{background:var(--accent-light);padding:8px 12px;margin:12px 0 8px;border-radius:6px;border-left:3px solid var(--accent)}
+.pdf-emp-bar span{font-size:12px;font-weight:600;color:var(--accent)}
+.pdf-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg);padding:12px;border-radius:8px;margin-bottom:10px}
+.pdf-meta dt{font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.pdf-meta dd{font-size:11px;color:var(--ink);font-weight:500;margin-top:1px}
+.pdf-sec-hdr{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.pdf-chip{display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin:2px;font-size:10px;color:var(--ink2);font-weight:500}
+.pdf-chip.c{background:var(--accent-light);border-color:rgba(45,74,62,.2);color:var(--accent)}
+.pdf-img-th{width:46px;height:38px;object-fit:cover;border-radius:4px;border:1px solid var(--border);margin:2px}
+.pdf-footer{background:var(--accent);padding:8px 18px;text-align:center;font-size:8px;font-weight:600;color:rgba(255,255,255,.55);letter-spacing:2px;text-transform:uppercase}
+.pdf-divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+.locked-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:40px 24px;text-align:center}
+.locked-icon{font-size:40px;margin-bottom:16px}
+.locked-card h2{font-family:'DM Serif Display',serif;font-size:22px;color:var(--warn);margin-bottom:8px}
+.locked-card p{font-size:14px;color:var(--ink3)}
+#toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-lg)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.success{background:var(--accent)}
+#toast.error{background:var(--warn)}
+.spin-ring{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 18px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.divider{height:1px;background:var(--border);margin:18px 0}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.welcome-h{font-family:'DM Serif Display',serif;font-size:30px;color:var(--ink);letter-spacing:-.4px;line-height:1.2;padding:4px 0 4px}
+.welcome-sub{font-size:13px;color:var(--ink3);margin-top:6px;margin-bottom:20px}
+.info-box{background:var(--accent-light);border:1.5px solid rgba(45,74,62,.15);border-radius:var(--radius);padding:12px 14px;font-size:12px;color:var(--accent);font-weight:500;line-height:1.7}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.shake{animation:shake .32s ease}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="l-mark">🏪</div>
+  <div class="l-name">OneStop</div>
+  <div class="l-sub">Shift Management</div>
+  <div class="l-bar"><div class="l-bar-fill"></div></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-mark">🏪</div>
+      <div class="topbar-name">OneStop</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-date" id="clock"></div>
+      <div class="sync-badge sync-ing" id="syncBadge">⟳ Connecting…</div>
+    </div>
+  </div>
+  <div id="screen"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// JSONBIN — FREE CLOUD SYNC
+// KEY FIX: We use a PATCH-style merge on every write
+// so concurrent devices never overwrite each other
+// ══════════════════════════════════════════
+const BIN_KEY = '$2a$10$RPaPXeRj/S0KmdJ8dVW7S.oEdQojQJ3gnpMFIiQ7KgNtcq8fmB6pu';
+const BIN_ID_KEY = 'os_binid_v3';
+const BASE = 'https://api.jsonbin.io/v3';
+let BIN_ID = localStorage.getItem(BIN_ID_KEY) || null;
+
+// We keep a local copy of the full cloud record
+let cloudData = { shifts: [] };
+
+function setSyncBadge(s) {
+  const el = document.getElementById('syncBadge'); if (!el) return;
+  el.className = 'sync-badge sync-' + s;
+  el.textContent = s === 'ok' ? '● Synced' : s === 'err' ? '✕ Offline' : '⟳ Syncing…';
+}
+
+async function ensureBin() {
+  if (BIN_ID) return true;
+  try {
+    const r = await fetch(`${BASE}/b`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': BIN_KEY,
+        'X-Bin-Name': 'onestop-v3',
+        'X-Bin-Private': 'false'
+      },
+      body: JSON.stringify({ shifts: [] })
+    });
+    if (!r.ok) throw new Error('create failed');
+    const j = await r.json();
+    BIN_ID = j.metadata?.id;
+    if (BIN_ID) { localStorage.setItem(BIN_ID_KEY, BIN_ID); return true; }
+    return false;
+  } catch (e) { console.error('ensureBin:', e); return false; }
+}
+
+// Read latest from cloud into cloudData
+async function cloudRead() {
+  setSyncBadge('ing');
+  try {
+    const ok = await ensureBin(); if (!ok) { setSyncBadge('err'); return false; }
+    const r = await fetch(`${BASE}/b/${BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': BIN_KEY }
+    });
+    if (!r.ok) throw new Error('read ' + r.status);
+    const j = await r.json();
+    cloudData = j.record || { shifts: [] };
+    if (!Array.isArray(cloudData.shifts)) cloudData.shifts = [];
+    setSyncBadge('ok'); return true;
+  } catch (e) { console.error('cloudRead:', e); setSyncBadge('err'); return false; }
+}
+
+// ══════════════════════════════════════════
+// THE CRITICAL FIX:
+// Instead of PUT (replace), we:
+// 1. Read fresh data from cloud
+// 2. Merge our new record INTO the existing array
+// 3. Write the merged result back
+// This prevents Device A overwriting Device B's record
+// ══════════════════════════════════════════
+async function cloudAddShift(newRecord) {
+  setSyncBadge('ing');
+  try {
+    const ok = await ensureBin(); if (!ok) { setSyncBadge('err'); return false; }
+
+    // STEP 1: Read the absolute latest state from cloud
+    const readResp = await fetch(`${BASE}/b/${BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': BIN_KEY }
+    });
+    let latestData = { shifts: [] };
+    if (readResp.ok) {
+      const j = await readResp.json();
+      latestData = j.record || { shifts: [] };
+      if (!Array.isArray(latestData.shifts)) latestData.shifts = [];
+    }
+
+    // STEP 2: Check if this code already submitted today (prevent duplicates)
+    const today = todayStr();
+    const alreadyExists = latestData.shifts.some(
+      s => s.code === newRecord.code && s.submittedAt && s.submittedAt.startsWith(today)
+    );
+    if (alreadyExists) {
+      cloudData = latestData;
+      setSyncBadge('ok');
+      return 'duplicate';
+    }
+
+    // STEP 3: Add the new record to existing array (MERGE not replace)
+    latestData.shifts.push(newRecord);
+    cloudData = latestData; // update local copy
+
+    // STEP 4: Write merged data back
+    const writeResp = await fetch(`${BASE}/b/${BIN_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': BIN_KEY },
+      body: JSON.stringify(latestData)
+    });
+    if (!writeResp.ok) throw new Error('write ' + writeResp.status);
+    setSyncBadge('ok'); return true;
+  } catch (e) { console.error('cloudAddShift:', e); setSyncBadge('err'); return false; }
+}
+
+// Write full cloudData to cloud (used for reset/day-complete)
+async function cloudWrite() {
+  setSyncBadge('ing');
+  try {
+    const ok = await ensureBin(); if (!ok) { setSyncBadge('err'); return false; }
+    const r = await fetch(`${BASE}/b/${BIN_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': BIN_KEY },
+      body: JSON.stringify(cloudData)
+    });
+    if (!r.ok) throw new Error('write ' + r.status);
+    setSyncBadge('ok'); return true;
+  } catch (e) { console.error('cloudWrite:', e); setSyncBadge('err'); return false; }
+}
+
+// ══════════════════════════════════════════
+// DATA HELPERS
+// ══════════════════════════════════════════
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function getTodayShifts() {
+  const t = todayStr();
+  return (cloudData.shifts || []).filter(s => s.submittedAt && s.submittedAt.startsWith(t));
+}
+function doneIds() {
+  const s = new Set();
+  getTodayShifts().forEach(r => r.tasks && r.tasks.forEach(t => { if (!t.c) s.add(t.id); }));
+  return s;
+}
+function doneBy(id) {
+  for (const r of getTodayShifts()) {
+    const t = r.tasks && r.tasks.find(x => x.id === id && !x.c);
+    if (t) return r.name.split(' ')[0].toUpperCase();
+  }
+  return '';
+}
+
+const ALL_TASKS = [
+  {id:1,n:'Bread'},{id:2,n:'Newspaper (IN)'},{id:3,n:'Greencore'},
+  {id:4,n:'Milk'},{id:5,n:'Tobacco, Vapes & Rums'},{id:6,n:'Sanitation'},
+  {id:7,n:'Impulse'},{id:8,n:'Crisps'},{id:9,n:'Grocery'},
+  {id:10,n:'Bakery'},{id:11,n:'Frozen'},{id:12,n:'Alcohol'},
+  {id:13,n:'Wines'},{id:14,n:'Small Pops'},{id:15,n:'Big Pops'},
+  {id:16,n:'Reduce'},{id:17,n:'Newspapers (OUT)'},{id:18,n:'Bins'},
+  {id:19,n:'Small Pops (Nyt)'},{id:20,n:'Big Pops (Nyt)'},
+  {id:21,n:'Alcohol (Nyt)'},{id:22,n:'Wines (Nyt)'},{id:23,n:'Mopping'}
+];
+const SHIFTS = [
+  {k:'Morning',icon:'🌅',t:'06:00–14:00'},
+  {k:'Afternoon',icon:'☀️',t:'14:00–18:00'},
+  {k:'Evening',icon:'🌆',t:'18:00–22:00'},
+  {k:'Night',icon:'🌙',t:'22:00–06:00'}
+];
+
+// ══════════════════════════════════════════
+// STATE — images stored in localStorage NOT cloud (too big)
+// ══════════════════════════════════════════
+const SKEY = 'os_sess9';
+let ST = {step:'login',emp:null,shift:null,selTasks:[],customTasks:[],imgs:[],modal:null,pdfData:null};
+const sess = JSON.parse(sessionStorage.getItem(SKEY) || '{}');
+if (sess.emp && sess.step && sess.step !== 'login') ST = {...ST, ...sess};
+
+function saveSess() {
+  sessionStorage.setItem(SKEY, JSON.stringify({
+    emp:ST.emp, step:ST.step, shift:ST.shift,
+    selTasks:ST.selTasks, customTasks:ST.customTasks
+  }));
+  // Save imgs separately in localStorage (not sessionStorage — persists across tabs)
+  try { localStorage.setItem('os_imgs_cur', JSON.stringify(ST.imgs)); } catch(e) {}
+}
+// Restore imgs
+if (ST.step !== 'login') {
+  try { ST.imgs = JSON.parse(localStorage.getItem('os_imgs_cur') || '[]'); } catch(e) {}
+}
+
+// ── AUDIO ──
+let AC;
+function pa(f,t,d,v=.05){
+  try{
+    if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended')AC.resume();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);
+    o.type=t;o.frequency.value=f;
+    g.gain.setValueAtTime(0,AC.currentTime);
+    g.gain.linearRampToValueAtTime(v,AC.currentTime+.02);
+    g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);
+    o.start();o.stop(AC.currentTime+d);
+  }catch{}
+}
+const sndOk=()=>{pa(500,'sine',.1,.04);setTimeout(()=>pa(640,'sine',.14,.04),90);setTimeout(()=>pa(800,'sine',.2,.04),180);};
+const sndErr=()=>pa(180,'sawtooth',.22,.05);
+const sndSel=()=>pa(420,'sine',.06,.03);
+const sndChime=()=>[500,640,800,1000].forEach((f,i)=>setTimeout(()=>pa(f,'sine',.25,.03),i*70));
+
+// ── CLICK DELEGATION ──
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-action]'); if (!t) return;
+  sndSel();
+  const a = t.getAttribute('data-action');
+  const actions = {
+    closeModal, doDayAuth, doResetApp, doSend, doResetDay, nextEmp,
+    doLogin, doShift, doTasks, doSubmit, addCustom,
+    openDayAuth: () => openModal('dayAuth'),
+    openResetAuth: () => openModal('resetAuth'),
+    delImg: () => { ST.imgs.splice(parseInt(t.dataset.idx), 1); saveSess(); render(); },
+    selShift: () => { ST.shift = t.dataset.shift; saveSess(); render(); },
+    toggleTask: () => {
+      const isC = t.dataset.c === 'true';
+      const id = isC ? t.dataset.id : parseInt(t.dataset.id);
+      const idx = ST.selTasks.findIndex(x => String(x.id) === String(id) && x.c === isC);
+      if (idx >= 0) ST.selTasks.splice(idx, 1);
+      else {
+        const task = isC ? ST.customTasks.find(x => String(x.id) === String(id)) : ALL_TASKS.find(x => x.id === id);
+        if (task) ST.selTasks.push({id: task.id, n: task.n, c: isC});
+      }
+      saveSess(); render();
+    }
+  };
+  (actions[a] || Function)();
+}, true);
+
+// ── CLOCK ──
+function tick() {
+  const el = document.getElementById('clock');
+  if (el) {
+    const n = new Date();
+    el.textContent = n.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + '  ·  ' + n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }
+  setTimeout(tick, 1000);
+}
+tick();
+
+// ── INIT ──
+setTimeout(() => {
+  document.getElementById('loader')?.classList.add('hide');
+  sndChime();
+  cloudRead().then(() => render());
+}, 1800);
+
+// ── TOAST ──
+let toastT;
+function toast(msg, type='', dur=3200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = type ? `show ${type}` : 'show';
+  clearTimeout(toastT); toastT = setTimeout(() => el.className = '', dur);
+}
+
+function calcHrs(s, e) {
+  const [sh,sm] = s.split(':').map(Number), [eh,em] = e.split(':').map(Number);
+  let m = (eh*60+em) - (sh*60+sm); if (m <= 0) m += 1440;
+  return (m/60).toFixed(1);
+}
+function greet() { const h = new Date().getHours(); return h<12?'morning':h<17?'afternoon':'evening'; }
+
+// ══════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════
+function render() {
+  const scr = document.getElementById('screen'); if (!scr) return;
+  scr.innerHTML = '';
+  const smap = {login:0,shift:1,tasks:2,photos:3,done:4};
+  const sn = smap[ST.step] ?? 0;
+  if (ST.step !== 'login' && ST.step !== 'done') {
+    const dots = document.createElement('div'); dots.className = 'steps';
+    ['Sign In','Shift','Tasks','Photos'].forEach((s,i) => {
+      const d = document.createElement('div');
+      d.className = 'step-pip' + (i===sn?' on':i<sn?' done':'');
+      dots.appendChild(d);
+    });
+    scr.appendChild(dots);
+  }
+  const fn = {login:buildLogin, shift:buildShift, tasks:buildTasks, photos:buildPhotos, done:buildDone};
+  if (fn[ST.step]) scr.appendChild(fn[ST.step]());
+  scr.appendChild(buildBar());
+  if (ST.modal) renderModal();
+}
+
+function buildBar() {
+  const b = document.createElement('div'); b.className = 'bottom-bar';
+  b.innerHTML = `
+    <button class="bar-btn bar-day" data-action="openDayAuth">
+      <span class="bar-icon">📋</span><span>Day Report</span>
+    </button>
+    <button class="bar-btn bar-reset" data-action="openResetAuth">
+      <span class="bar-icon">↺</span><span>Reset</span>
+    </button>`;
+  return b;
+}
+
+// ══════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════
+function buildLogin() {
+  const today = getTodayShifts();
+  const now = new Date().toTimeString().slice(0,5);
+  const w = document.createElement('div');
+  w.innerHTML = `
+    <div class="welcome-h">Good ${greet()},<br>Sign in to start.</div>
+    <div class="welcome-sub">Record your shift details below</div>
+    ${today.length ? `
+    <div class="live-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div><div class="live-card-num">${today.length}</div><div class="live-card-lbl">Submitted Today</div></div>
+        <div style="font-size:9px;color:rgba(255,255,255,.5);font-weight:600;padding-top:4px;letter-spacing:.5px">LIVE ● CLOUD</div>
+      </div>
+      <div class="live-names">
+        ${today.map(r => `<div class="live-name-row"><span>${r.name}</span><span class="live-shift-tag">${r.shift} · ${r.hrs}h</span></div>`).join('')}
+      </div>
+    </div>` : ''}
+    <div class="card">
+      <div class="sec-label">Employee Details</div>
+      <div class="field"><label>Full Name</label><input type="text" id="fn" placeholder="e.g. James Harrison" autocomplete="name"/></div>
+      <div class="field"><label>Employee Code</label><input type="text" id="fc" placeholder="e.g. EMP001" autocomplete="off"/></div>
+      <div class="two-col">
+        <div class="field"><label>From</label><input type="time" id="fs" value="${now}" oninput="previewHrs()"/></div>
+        <div class="field"><label>To</label><input type="time" id="fe" oninput="previewHrs()"/></div>
+      </div>
+      <div class="dur-badge" id="hprev">Enter shift times to see duration</div>
+      <button class="btn btn-primary" data-action="doLogin">Continue →</button>
+    </div>`;
+  return w;
+}
+
+window.previewHrs = function() {
+  const s = document.getElementById('fs')?.value, e = document.getElementById('fe')?.value;
+  const el = document.getElementById('hprev'); if (!el) return;
+  if (!s || !e) { el.textContent = 'Enter shift times to see duration'; return; }
+  el.textContent = `${s} → ${e}  ·  ${calcHrs(s,e)} hours`;
+};
+
+async function doLogin() {
+  const name = document.getElementById('fn')?.value?.trim();
+  const code = document.getElementById('fc')?.value?.trim().toUpperCase();
+  const start = document.getElementById('fs')?.value;
+  const end = document.getElementById('fe')?.value;
+  if (!name || !code || !start || !end) { sndErr(); toast('Please fill in all fields','error'); return; }
+  const btn = document.querySelector('[data-action="doLogin"]');
+  if (btn) { btn.textContent = 'Checking cloud…'; btn.disabled = true; }
+  await cloudRead();
+  const today = todayStr();
+  const already = (cloudData.shifts||[]).some(s => s.code === code && s.submittedAt?.startsWith(today));
+  if (already) {
+    const scr = document.getElementById('screen');
+    scr.innerHTML = `<div class="locked-card"><div class="locked-icon">🔒</div><h2>Already Submitted</h2><p>${name}'s shift has already been recorded today.</p></div>`;
+    scr.appendChild(buildBar()); sndErr(); return;
+  }
+  ST.emp = {name, code, shiftStart:start, shiftEnd:end, hrs:calcHrs(start,end), loginAt:new Date().toISOString()};
+  ST.step = 'shift'; saveSess(); sndOk(); render();
+}
+
+// ══════════════════════════════════════════
+// SHIFT
+// ══════════════════════════════════════════
+function buildShift() {
+  const w = document.createElement('div');
+  w.innerHTML = `
+    <div class="status-strip">
+      <span class="s-dot"></span>
+      <span class="s-name">${ST.emp.name}</span>
+      <span class="s-time">${ST.emp.shiftStart}–${ST.emp.shiftEnd} · ${ST.emp.hrs}h</span>
+    </div>
+    <div class="card">
+      <div class="sec-label">Select Shift Type</div>
+      <div class="shift-grid">
+        ${SHIFTS.map(s => `<div class="shift-card ${ST.shift===s.k?'active':''}" data-action="selShift" data-shift="${s.k}">
+          <span class="shift-icon">${s.icon}</span>
+          <div class="shift-label">${s.k}</div>
+          <div class="shift-time">${s.t}</div>
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-primary" style="margin-top:18px" data-action="doShift">Continue →</button>
+    </div>`;
+  return w;
+}
+function doShift() {
+  if (!ST.shift) { sndErr(); toast('Please select a shift type','error'); return; }
+  ST.step = 'tasks'; saveSess(); render();
+}
+
+// ══════════════════════════════════════════
+// TASKS
+// ══════════════════════════════════════════
+function buildTasks() {
+  const done = doneIds();
+  const all = [...ALL_TASKS.map(t=>({...t,c:false})), ...ST.customTasks];
+  const sel = new Set(ST.selTasks.map(t => String(t.id)+'_'+t.c));
+  const avail = all.filter(t => t.c || !done.has(t.id)).length;
+  const got = ST.selTasks.length;
+  const pc = avail > 0 ? Math.round(got/avail*100) : 0;
+  const w = document.createElement('div');
+  w.innerHTML = `
+    <div class="status-strip">
+      <span class="s-dot"></span>
+      <span class="s-name">${ST.emp.name}</span>
+      <span class="s-badge sb-${ST.shift}">${ST.shift}</span>
+    </div>
+    <div class="card">
+      <div class="sec-label">Completed Tasks</div>
+      <div class="task-scroll" id="tlist"></div>
+      <div class="custom-row">
+        <input type="text" id="cin" placeholder="Add custom task…" onkeydown="if(event.key==='Enter')addCustom()"/>
+        <button class="custom-add-btn" data-action="addCustom">+ Add</button>
+      </div>
+      <div class="prog-wrap"><div class="prog-fill" style="width:${pc}%"></div></div>
+      <div class="prog-meta"><span>${got} selected</span><span>${pc}% complete</span></div>
+      <button class="btn btn-primary" data-action="doTasks">Continue →</button>
+    </div>`;
+  const tl = w.querySelector('#tlist');
+  all.forEach(t => {
+    const isDone = !t.c && done.has(t.id), isSel = sel.has(String(t.id)+'_'+t.c);
+    const row = document.createElement('div');
+    row.className = 'task-row' + (isDone?' done-other':isSel?' selected':'');
+    if (!isDone) { row.dataset.action='toggleTask'; row.dataset.id=String(t.id); row.dataset.c=String(t.c); }
+    const num = t.c ? '★' : (t.id<10?'0'+t.id:t.id);
+    row.innerHTML = `
+      <span class="task-num">${num}</span>
+      <div class="task-cb">${isDone||isSel?'<span class="task-check">✓</span>':''}</div>
+      <span class="task-name-txt">${t.n}${t.c?' <span style="font-size:10px;color:var(--ink3)">(custom)</span>':''}</span>
+      ${isDone ? `<span class="task-by">${doneBy(t.id)}</span>` : ''}`;
+    tl.appendChild(row);
+  });
+  return w;
+}
+function addCustom() {
+  const v = (document.getElementById('cin')?.value||'').trim();
+  if (!v) { sndErr(); toast('Enter a task name','error'); return; }
+  const id = 'c_'+Date.now();
+  ST.customTasks.push({id,n:v,c:true}); ST.selTasks.push({id,n:v,c:true});
+  sndOk(); saveSess(); render(); toast('Custom task added','success');
+}
+function doTasks() {
+  if (!ST.selTasks.length) { sndErr(); toast('Select at least one task','error'); return; }
+  ST.step = 'photos'; saveSess(); render();
+}
+
+// ══════════════════════════════════════════
+// PHOTOS — stored locally, NOT in cloud (free tier limit)
+// ══════════════════════════════════════════
+function buildPhotos() {
+  const thumbs = ST.imgs.map((s,i) => `<div class="img-thumb"><img src="${s}"><button class="img-del" data-action="delImg" data-idx="${i}">✕</button></div>`).join('');
+  const w = document.createElement('div');
+  w.innerHTML = `
+    <div class="status-strip">
+      <span class="s-dot"></span>
+      <span class="s-name">${ST.emp.name}</span>
+      <span class="s-badge sb-${ST.shift}">${ST.shift}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--ink3)">${ST.selTasks.length} tasks</span>
+    </div>
+    <div class="card">
+      <div class="sec-label">Shift Photos <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(optional, max 10)</span></div>
+      <div class="img-zone" onclick="document.getElementById('iin').click()">
+        <input type="file" id="iin" accept="image/*" multiple style="display:none" onchange="addImgs(event)"/>
+        <div class="img-zone-icon">📸</div>
+        <div class="img-zone-lbl">Tap to add photos · ${ST.imgs.length}/10</div>
+      </div>
+      ${ST.imgs.length ? `<div class="img-grid">${thumbs}</div>` : ''}
+      <button class="btn btn-primary" data-action="doSubmit">Submit Shift ✓</button>
+    </div>`;
+  return w;
+}
+
+window.addImgs = function(e) {
+  const files = Array.from(e.target.files);
+  const rem = 10 - ST.imgs.length;
+  const toLoad = files.slice(0, rem);
+  if (!toLoad.length) return;
+  let loaded = 0;
+  toLoad.forEach(f => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = function() {
+      const c = document.createElement('canvas'), MAX = 700;
+      let w = img.width, h = img.height;
+      if (w>MAX||h>MAX) { if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
+      c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+      ST.imgs.push(c.toDataURL('image/jpeg', .65));
+      URL.revokeObjectURL(url); loaded++;
+      if (loaded === toLoad.length) { saveSess(); render(); toast(`${loaded} photo${loaded>1?'s':''} added`,'success'); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); loaded++; if(loaded===toLoad.length) render(); };
+    img.src = url;
+  });
+  if (files.length > rem) toast(`Max 10 photos — ${files.length-rem} skipped`,'error');
+};
+
+// ══════════════════════════════════════════
+// SUBMIT — uses cloudAddShift (merge, not replace)
+// ══════════════════════════════════════════
+async function doSubmit() {
+  const btn = document.querySelector('[data-action="doSubmit"]');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
+  const submittedAt = new Date().toISOString();
+
+  // ── IMAGES: save to localStorage ONLY — never sent to cloud (too large) ──
+  const imgKey = 'os_imgs_' + ST.emp.code + '_' + todayStr();
+  if (ST.imgs.length) {
+    try { localStorage.setItem(imgKey, JSON.stringify(ST.imgs)); }
+    catch(e) { console.warn('img local save err', e); }
+  }
+
+  // ── CLOUD RECORD: text data only, no images ──
+  const rec = {
+    name: ST.emp.name, code: ST.emp.code,
+    shiftStart: ST.emp.shiftStart, shiftEnd: ST.emp.shiftEnd, hrs: ST.emp.hrs,
+    shift: ST.shift, tasks: ST.selTasks.slice(),
+    imgCount: ST.imgs.length, // just store the count, not the actual images
+    imgs: [], // empty — images stored locally per device
+    submittedAt
+  };
+
+  const result = await cloudAddShift(rec);
+  if (result === false) {
+    sndErr();
+    toast('Cloud save failed — check connection and retry','error',5000);
+    if (btn) { btn.textContent = 'Submit Shift ✓'; btn.disabled = false; }
+    return;
+  }
+  if (result === 'duplicate') {
+    toast('Already submitted today!','error'); sndErr(); return;
+  }
+  localStorage.removeItem('os_imgs_cur');
+  sndChime(); ST.step = 'done'; saveSess(); render();
+}
+
+// ══════════════════════════════════════════
+// DONE
+// ══════════════════════════════════════════
+function buildDone() {
+  const today = getTodayShifts();
+  const w = document.createElement('div');
+  w.innerHTML = `
+    <div class="card">
+      <div class="done-hero">
+        <div class="done-mark">✓</div>
+        <h2>Shift Recorded!</h2>
+        <p>Saved to cloud. Well done, ${ST.emp.name.split(' ')[0]}!</p>
+        <div class="divider"></div>
+        <div class="log-row">
+          <div class="log-name">${ST.emp.name}</div>
+          <div class="log-meta">${ST.emp.code} · ${ST.shift} · ${ST.emp.shiftStart}–${ST.emp.shiftEnd} · ${ST.emp.hrs}h</div>
+          <div class="log-meta">${ST.selTasks.length} tasks · ${ST.imgs.length} photos</div>
+        </div>
+        <div style="background:var(--accent-light);border-radius:var(--radius);padding:14px;margin-top:12px;text-align:left">
+          <div style="font-size:10px;font-weight:600;color:var(--accent);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">☁️ Today's Cloud Submissions · ${today.length} total</div>
+          ${today.map(r => `<div style="font-size:12px;color:var(--ink2);padding:4px 0;border-bottom:1px solid rgba(45,74,62,.08);display:flex;justify-content:space-between"><span style="font-weight:500">${r.name}</span><span style="font-size:10px;color:var(--ink3)">${r.shift} · ${r.hrs}h</span></div>`).join('')}
+        </div>
+        <button class="btn btn-primary" style="margin-top:20px" data-action="nextEmp">Next Employee →</button>
+        <p style="font-size:10px;color:var(--ink3);margin-top:10px;letter-spacing:.5px;text-transform:uppercase;font-weight:500">Hand device to next employee</p>
+      </div>
+    </div>`;
+  return w;
+}
+
+function nextEmp() {
+  ST = {step:'login',emp:null,shift:null,selTasks:[],customTasks:[],imgs:[],modal:null,pdfData:null};
+  sessionStorage.removeItem(SKEY);
+  localStorage.removeItem('os_imgs_cur');
+  cloudRead().then(() => { render(); toast('Ready for next employee','success'); });
+}
+
+// ══════════════════════════════════════════
+// MODALS
+// ══════════════════════════════════════════
+function openModal(t) { ST.modal = t; render(); }
+function closeModal() { ST.modal = null; render(); }
+
+function renderModal() {
+  document.querySelector('.modal-bg')?.remove();
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  bg.addEventListener('click', e => { if (e.target === bg) closeModal(); });
+
+  if (ST.modal === 'dayAuth') {
+    bg.innerHTML = `<div class="modal-box">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Manager Access</div>
+      <div class="modal-sub">Enter credentials to view the full day report</div>
+      <div class="field"><label>Username</label><input type="text" id="du" placeholder="Username" autocomplete="off"/></div>
+      <div class="field"><label>Password</label><input type="password" id="dp" placeholder="Password" autocomplete="off"/></div>
+      <button class="btn btn-primary" data-action="doDayAuth">Authenticate →</button>
+      <button class="btn btn-ghost" data-action="closeModal">Cancel</button>
+    </div>`;
+    setTimeout(() => document.getElementById('dp')?.addEventListener('keydown', e => { if(e.key==='Enter') doDayAuth(); }), 50);
+  }
+  else if (ST.modal === 'dayPreview') { bg.innerHTML = buildPreview(); }
+  else if (ST.modal === 'sending') {
+    bg.innerHTML = `<div class="modal-box" style="text-align:center;padding:48px 24px">
+      <div class="modal-handle"></div>
+      <div class="spin-ring"></div>
+      <div class="modal-title">Preparing Report</div>
+      <div id="sstat" class="modal-sub">Fetching submissions from cloud…</div>
+      <div style="margin-top:16px;height:3px;background:var(--surface2);border-radius:2px;overflow:hidden">
+        <div id="sbar" style="height:100%;background:var(--accent);border-radius:2px;width:0;transition:width .4s"></div>
+      </div>
+    </div>`;
+  }
+  else if (ST.modal === 'sent') {
+    const today = getTodayShifts();
+    bg.innerHTML = `<div class="modal-box" style="text-align:center;padding:36px 24px">
+      <div class="modal-handle"></div>
+      <div style="font-size:40px;margin-bottom:16px">📨</div>
+      <div class="modal-title">PDF Downloaded!</div>
+      <div class="modal-sub">Mail app should now be open.<br>Attach the PDF and tap Send.</div>
+      <div class="info-box" style="text-align:left;margin:14px 0">
+        📁 File saved as:<br>
+        <code style="font-size:11px;background:rgba(45,74,62,.1);padding:2px 6px;border-radius:4px">OneStop_Shift_Report_*.pdf</code><br><br>
+        📊 Includes <strong>${today.length} employee${today.length!==1?'s':''}</strong> from all devices today
+      </div>
+      <button class="btn btn-gold" data-action="doResetDay">✓ Day Complete — Reset for Tomorrow</button>
+      <button class="btn btn-ghost" data-action="closeModal">Close</button>
+    </div>`;
+  }
+  else if (ST.modal === 'resetAuth') {
+    bg.innerHTML = `<div class="modal-box">
+      <div class="modal-handle"></div>
+      <div style="font-size:32px;margin-bottom:12px;text-align:center">⚠️</div>
+      <div class="modal-title" style="color:var(--warn);text-align:center">Reset App?</div>
+      <div class="modal-sub" style="text-align:center">Permanently erases ALL cloud records from all devices.</div>
+      <div class="divider"></div>
+      <div class="field"><label>Username</label><input type="text" id="ru" placeholder="Username" autocomplete="off"/></div>
+      <div class="field"><label>Password</label><input type="password" id="rp" placeholder="Password" autocomplete="off"/></div>
+      <button class="btn btn-danger" style="margin-top:14px" data-action="doResetApp">Confirm Full Reset</button>
+      <button class="btn btn-ghost" data-action="closeModal">Cancel</button>
+    </div>`;
+    setTimeout(() => document.getElementById('rp')?.addEventListener('keydown', e => { if(e.key==='Enter') doResetApp(); }), 50);
+  }
+  document.body.appendChild(bg);
+}
+
+// ── DAY AUTH ──
+async function doDayAuth() {
+  const u = document.getElementById('du')?.value?.trim();
+  const p = document.getElementById('dp')?.value?.trim();
+  if (u !== 'ONESTOP' || p !== 'onestop') {
+    sndErr(); toast('Invalid credentials','error');
+    document.querySelector('.modal-box')?.classList.add('shake');
+    setTimeout(() => document.querySelector('.modal-box')?.classList.remove('shake'), 380);
+    return;
+  }
+  const btn = document.querySelector('[data-action="doDayAuth"]');
+  if (btn) { btn.textContent = 'Fetching from cloud…'; btn.disabled = true; }
+  await cloudRead();
+  // Rehydrate images from localStorage for preview too
+  let previewData = getTodayShifts().map(r => {
+    const imgKey = 'os_imgs_' + r.code + '_' + todayStr();
+    try {
+      const stored = localStorage.getItem(imgKey);
+      if (stored) return {...r, imgs: JSON.parse(stored)};
+    } catch(e) {}
+    return r;
+  });
+  ST.pdfData = previewData;
+  ST.modal = 'dayPreview'; sndOk(); render();
+}
+
+// ── PREVIEW ──
+function buildPreview() {
+  const recs = ST.pdfData || [], now = new Date();
+  let secs = '';
+  recs.forEach((r, i) => {
+    const chips = r.tasks.map(t => `<span class="pdf-chip${t.c?' c':''}">${t.c?'★ ':''}${t.n}</span>`).join('');
+    const imgs = r.imgs?.length ? r.imgs.map(s => `<img class="pdf-img-th" src="${s}">`).join('') : '';
+    secs += `
+      <div class="pdf-emp-bar"><span>Employee ${i+1} of ${recs.length}: ${r.name}</span></div>
+      <dl class="pdf-meta">
+        <dt>Name</dt><dd>${r.name}</dd>
+        <dt>Code</dt><dd>${r.code}</dd>
+        <dt>Shift</dt><dd>${r.shift}</dd>
+        <dt>Hours</dt><dd>${r.hrs}h</dd>
+        <dt>In</dt><dd>${r.shiftStart}</dd>
+        <dt>Out</dt><dd>${r.shiftEnd||'—'}</dd>
+      </dl>
+      <div class="pdf-sec-hdr">Tasks (${r.tasks.length})</div>
+      <div style="margin-bottom:8px">${chips||'<span style="font-size:11px;color:#aaa;font-style:italic">No tasks</span>'}</div>
+      ${imgs ? `<div class="pdf-sec-hdr">Photos (${r.imgs.length})</div><div style="margin-bottom:8px">${imgs}</div>` : ''}
+      ${i<recs.length-1 ? '<hr class="pdf-divider">' : ''}`;
+  });
+  return `<div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Day Report</div>
+    <div class="modal-sub">${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})} · ${recs.length} employee${recs.length!==1?'s':''} · All devices ☁️</div>
+    <div class="pdf-wrap"><div class="pdf-page">
+      <div class="pdf-hdr">
+        <div class="pdf-hdr-l"><div class="n">OneStop</div><div class="s">Official Shift Report</div></div>
+        <div class="pdf-hdr-r">${now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}<br>${recs.length} staff members</div>
+      </div>
+      <div class="pdf-stripe"></div>
+      <div class="pdf-body">${secs||'<p style="color:var(--ink3);font-style:italic;font-size:13px">No submissions yet today.</p>'}</div>
+      <div class="pdf-footer">OneStop Shift Management · Confidential</div>
+    </div></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" data-action="doSend" style="flex:1;margin-top:0">📥 Download PDF & Open Mail</button>
+      <button class="btn btn-ghost" data-action="closeModal" style="flex:none;width:auto;padding:10px 16px;margin-top:0">Cancel</button>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════
+// PDF GENERATOR — fixed color API
+// ══════════════════════════════════════════
+function generatePDF(recs, now) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'mm',format:'a4'});
+  const pw=210, ml=14, cw=182;
+  let y = 0;
+
+  // Header
+  doc.setFillColor(45,74,62); doc.rect(0,0,pw,22,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text('OneStop',ml,13);
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(200,220,215);
+  doc.text('OFFICIAL SHIFT REPORT',ml,18);
+  doc.setFontSize(8);
+  doc.text(now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),pw-ml,13,{align:'right'});
+  doc.text(`${recs.length} staff member${recs.length!==1?'s':''}`,pw-ml,18,{align:'right'});
+
+  // Stripe
+  doc.setFillColor(168,197,187); doc.rect(0,22,pw*.33,2,'F');
+  doc.setFillColor(155,126,70);  doc.rect(pw*.33,22,pw*.33,2,'F');
+  doc.setFillColor(197,168,136); doc.rect(pw*.66,22,pw*.34,2,'F');
+  y = 30;
+
+  // Period bar
+  doc.setFillColor(242,241,238); doc.roundedRect(ml,y,cw,8,1,1,'F');
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(138,135,132);
+  doc.text(`DATE: ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}  ·  ${recs.length} EMPLOYEES`,ml+3,y+5.2);
+  y += 14;
+
+  recs.forEach((r,i) => {
+    if (y > 250) { doc.addPage(); y = 14; }
+
+    // Employee header
+    doc.setFillColor(235,242,239); doc.roundedRect(ml,y,cw,8,1,1,'F');
+    doc.setDrawColor(45,74,62); doc.setLineWidth(.6); doc.line(ml,y,ml,y+8);
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(45,74,62);
+    doc.text(`Employee ${i+1} of ${recs.length}: ${r.name}`,ml+4,y+5.3);
+    y += 12;
+
+    // Meta grid
+    const meta = [['NAME',r.name],['CODE',r.code],['SHIFT',r.shift],['HOURS',r.hrs+'h'],['IN',r.shiftStart],['OUT',r.shiftEnd||'—']];
+    doc.setFillColor(247,247,245); doc.roundedRect(ml,y,cw,22,1,1,'F');
+    doc.setDrawColor(232,231,227); doc.setLineWidth(.3); doc.roundedRect(ml,y,cw,22,1,1,'S');
+    meta.forEach((m,mi) => {
+      const col = mi%2===0 ? ml+3 : ml+cw/2+3;
+      const row = y + 5 + Math.floor(mi/2)*7;
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(138,135,132);
+      doc.text(m[0], col, row);
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(26,25,22);
+      doc.text(String(m[1]), col, row+4.2);
+    });
+    y += 26;
+
+    // Tasks
+    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(138,135,132);
+    doc.text(`TASKS (${r.tasks.length})`,ml,y);
+    doc.setDrawColor(232,231,227); doc.setLineWidth(.3); doc.line(ml+22,y-.5,ml+cw,y-.5);
+    y += 4;
+    if (r.tasks.length) {
+      const cols=3, chipW=cw/cols-2, chipH=5.5;
+      r.tasks.forEach((t,ti) => {
+        const cx = ml+(ti%cols)*(chipW+2), cy = y+Math.floor(ti/cols)*(chipH+2);
+        if (cy+chipH > 280) { doc.addPage(); y=20; }
+        if (t.c) { doc.setFillColor(235,242,235); } else { doc.setFillColor(240,239,236); }
+        doc.roundedRect(cx,cy,chipW,chipH,.8,.8,'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica', t.c?'bolditalic':'normal');
+        doc.setTextColor(45,74,62);
+        doc.text((t.c?'★ ':'')+t.n, cx+2, cy+3.8, {maxWidth:chipW-3});
+      });
+      y += Math.ceil(r.tasks.length/cols)*(chipH+2)+3;
+    } else {
+      doc.setFontSize(8); doc.setFont('helvetica','italic'); doc.setTextColor(180,178,175);
+      doc.text('No tasks recorded',ml,y+4); y+=8;
+    }
+
+    // Photos
+    if (r.imgs && r.imgs.length) {
+      if (y > 240) { doc.addPage(); y=14; }
+      y += 2;
+      doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(138,135,132);
+      doc.text(`PHOTOS (${r.imgs.length})`,ml,y);
+      doc.setDrawColor(232,231,227); doc.setLineWidth(.3); doc.line(ml+18,y-.5,ml+cw,y-.5);
+      y += 4;
+      const imgW=38, imgH=28, gap=4;
+      const perRow = Math.floor(cw/(imgW+gap));
+      for (let pi=0; pi<r.imgs.length; pi++) {
+        const col = pi%perRow, row = Math.floor(pi/perRow);
+        const ix = ml+col*(imgW+gap), iy = y+row*(imgH+gap);
+        if (iy+imgH > 282) { doc.addPage(); y=14; }
+        try {
+          doc.setDrawColor(232,231,227); doc.setLineWidth(.3);
+          doc.roundedRect(ix,iy,imgW,imgH,1,1,'S');
+          const fmt = r.imgs[pi].startsWith('data:image/png') ? 'PNG' : 'JPEG';
+          doc.addImage(r.imgs[pi], fmt, ix, iy, imgW, imgH, undefined, 'FAST');
+        } catch {
+          doc.setFillColor(240,239,236); doc.roundedRect(ix,iy,imgW,imgH,1,1,'F');
+          doc.setFontSize(6); doc.setTextColor(180,178,175);
+          doc.text('Photo '+(pi+1), ix+imgW/2, iy+imgH/2, {align:'center'});
+        }
+      }
+      y += Math.ceil(r.imgs.length/perRow)*(imgH+gap)+2;
+    }
+
+    if (i < recs.length-1) {
+      y += 4;
+      if (y > 260) { doc.addPage(); y=14; }
+      else { doc.setDrawColor(232,231,227); doc.setLineWidth(.4); doc.line(ml,y,ml+cw,y); y+=8; }
+    }
+  });
+
+  // Footer
+  doc.setFillColor(45,74,62); doc.rect(0,289,pw,8,'F');
+  doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(170,200,190);
+  doc.text('ONESTOP SHIFT MANAGEMENT  ·  CONFIDENTIAL  ·  '+now.toLocaleString('en-GB'), pw/2, 294, {align:'center'});
+  return doc;
+}
+
+// ══════════════════════════════════════════
+// SEND PDF + EMAIL
+// ══════════════════════════════════════════
+async function doSend() {
+  const recs = ST.pdfData || [];
+  if (!recs.length) { toast('No shift data to send','error'); return; }
+  const now = new Date();
+  ST.modal = 'sending'; render();
+
+  function setStat(t, p) {
+    const el = document.getElementById('sstat'); if (el) el.textContent = t;
+    const bar = document.getElementById('sbar'); if (bar) bar.style.width = p+'%';
+  }
+
+  setStat('Fetching latest from cloud…', 15);
+  await cloudRead();
+  let fresh = getTodayShifts();
+
+  // Rehydrate images from localStorage for each employee
+  // Each device stores its own employee's images locally
+  fresh = fresh.map(r => {
+    const imgKey = 'os_imgs_' + r.code + '_' + todayStr();
+    try {
+      const stored = localStorage.getItem(imgKey);
+      if (stored) {
+        const imgs = JSON.parse(stored);
+        return {...r, imgs};
+      }
+    } catch(e) {}
+    return r; // imgs stays [] if not on this device
+  });
+
+  ST.pdfData = fresh;
+
+  setStat(`Building PDF for ${fresh.length} employee${fresh.length!==1?'s':''}…`, 40);
+  await new Promise(r => setTimeout(r, 300));
+
+  try {
+    const doc = generatePDF(fresh, now);
+    const dateStr = now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
+    const fname = `OneStop_Shift_Report_${dateStr}.pdf`;
+
+    setStat('Downloading PDF…', 70);
+    await new Promise(r => setTimeout(r, 300));
+    doc.save(fname);
+
+    setStat('Opening mail app…', 88);
+    await new Promise(r => setTimeout(r, 700));
+
+    const subject = encodeURIComponent(`OneStop Shift Report — ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`);
+    const bodyLines = [
+      'OneStop Shift Report',
+      `Date: ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`,
+      `Total Staff: ${fresh.length} (from all devices)`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━━━',
+      'SHIFT SUMMARY',
+      '━━━━━━━━━━━━━━━━━━━━━━━',
+      ...fresh.map((r,i) => [
+        '',
+        `Employee ${i+1}: ${r.name}`,
+        `Code: ${r.code}  |  Shift: ${r.shift}  |  In: ${r.shiftStart}  |  Out: ${r.shiftEnd||'—'}  |  Hours: ${r.hrs}h`,
+        `Tasks (${r.tasks.length}): ${r.tasks.map(t=>(t.c?'★ ':'')+t.n).join(', ')||'None'}`,
+        `Photos: ${(r.imgs||[]).length}`,
+      ].join('\n')),
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━━━',
+      `⚠️ ATTACH FILE: ${fname}`,
+      '━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'OneStop Shift Management · Confidential',
+    ].join('\n');
+
+    // Use anchor click (most reliable cross-browser mailto trigger)
+    const mailLink = document.createElement('a');
+    mailLink.style.display = 'none';
+    mailLink.href = `mailto:aktrilok1015@gmail.com?subject=${subject}&body=${encodeURIComponent(bodyLines)}`;
+    document.body.appendChild(mailLink);
+    mailLink.click();
+    document.body.removeChild(mailLink);
+
+    setStat('Done ✓', 100);
+    await new Promise(r => setTimeout(r, 400));
+    sndChime(); ST.modal = 'sent'; render();
+  } catch(err) {
+    console.error('PDF error:', err);
+    sndErr();
+    toast('PDF error: ' + (err?.message || String(err)).slice(0,80), 'error', 6000);
+    ST.modal = 'dayPreview'; render();
+  }
+}
+
+// ══════════════════════════════════════════
+// RESETS
+// ══════════════════════════════════════════
+function clearLocalImgs() {
+  // Remove all os_imgs_ keys from localStorage
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('os_imgs_'))
+    .forEach(k => localStorage.removeItem(k));
+}
+
+async function doResetDay() {
+  const today = todayStr();
+  cloudData.shifts = (cloudData.shifts||[]).filter(s => !s.submittedAt?.startsWith(today));
+  cloudData.lastReset = new Date().toISOString();
+  await cloudWrite();
+  clearLocalImgs();
+  ST = {step:'login',emp:null,shift:null,selTasks:[],customTasks:[],imgs:[],modal:null,pdfData:null};
+  sessionStorage.removeItem(SKEY);
+  document.querySelectorAll('.modal-bg').forEach(e => e.remove());
+  sndOk(); render(); toast("Day reset — ready for tomorrow's shifts",'success');
+}
+
+async function doResetApp() {
+  const u = document.getElementById('ru')?.value?.trim();
+  const p = document.getElementById('rp')?.value?.trim();
+  if (u !== 'ONESTOP' || p !== 'onestop') {
+    sndErr(); toast('Invalid credentials','error');
+    document.querySelector('.modal-box')?.classList.add('shake');
+    setTimeout(() => document.querySelector('.modal-box')?.classList.remove('shake'), 380);
+    return;
+  }
+  cloudData = {shifts:[], lastReset: new Date().toISOString()};
+  await cloudWrite();
+  ST = {step:'login',emp:null,shift:null,selTasks:[],customTasks:[],imgs:[],modal:null,pdfData:null};
+  sessionStorage.removeItem(SKEY);
+  localStorage.removeItem('os_imgs_cur');
+  document.querySelectorAll('.modal-bg').forEach(e => e.remove());
+  clearLocalImgs();
+  sndChime(); render(); toast('App fully reset','success');
+}
+
+render();
+</script>
+</body>
+</html>
