@@ -208,16 +208,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 
 <script>
 // ══════════════════════════════════════════
-// JSONBIN — FREE CLOUD SYNC
-// KEY FIX: We use a PATCH-style merge on every write
-// so concurrent devices never overwrite each other
+// SHARED CLOUD SYNC (JSONBIN)
 // ══════════════════════════════════════════
 const BIN_KEY = '$2a$10$RPaPXeRj/S0KmdJ8dVW7S.oEdQojQJ3gnpMFIiQ7KgNtcq8fmB6pu';
-const BIN_ID_KEY = 'os_binid_v3';
-const BASE = 'https://api.jsonbin.io/v3';
-let BIN_ID = localStorage.getItem(BIN_ID_KEY) || null;
 
-// We keep a local copy of the full cloud record
+// ⚠️ IMPORTANT: Replace the string below with your ACTUAL Bin ID from jsonbin.io
+const BIN_ID = 'PASTE_YOUR_BIN_ID_HERE'; 
+
+const BASE = 'https://api.jsonbin.io/v3';
 let cloudData = { shifts: [] };
 
 function setSyncBadge(s) {
@@ -226,32 +224,10 @@ function setSyncBadge(s) {
   el.textContent = s === 'ok' ? '● Synced' : s === 'err' ? '✕ Offline' : '⟳ Syncing…';
 }
 
-async function ensureBin() {
-  if (BIN_ID) return true;
-  try {
-    const r = await fetch(`${BASE}/b`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': BIN_KEY,
-        'X-Bin-Name': 'onestop-v3',
-        'X-Bin-Private': 'false'
-      },
-      body: JSON.stringify({ shifts: [] })
-    });
-    if (!r.ok) throw new Error('create failed');
-    const j = await r.json();
-    BIN_ID = j.metadata?.id;
-    if (BIN_ID) { localStorage.setItem(BIN_ID_KEY, BIN_ID); return true; }
-    return false;
-  } catch (e) { console.error('ensureBin:', e); return false; }
-}
-
-// Read latest from cloud into cloudData
+// Read latest from shared cloud
 async function cloudRead() {
   setSyncBadge('ing');
   try {
-    const ok = await ensureBin(); if (!ok) { setSyncBadge('err'); return false; }
     const r = await fetch(`${BASE}/b/${BIN_ID}/latest`, {
       headers: { 'X-Master-Key': BIN_KEY }
     });
@@ -263,20 +239,11 @@ async function cloudRead() {
   } catch (e) { console.error('cloudRead:', e); setSyncBadge('err'); return false; }
 }
 
-// ══════════════════════════════════════════
-// THE CRITICAL FIX:
-// Instead of PUT (replace), we:
-// 1. Read fresh data from cloud
-// 2. Merge our new record INTO the existing array
-// 3. Write the merged result back
-// This prevents Device A overwriting Device B's record
-// ══════════════════════════════════════════
+// Merge new record into shared cloud array
 async function cloudAddShift(newRecord) {
   setSyncBadge('ing');
   try {
-    const ok = await ensureBin(); if (!ok) { setSyncBadge('err'); return false; }
-
-    // STEP 1: Read the absolute latest state from cloud
+    // 1. Read fresh data first to prevent overwriting other devices
     const readResp = await fetch(`${BASE}/b/${BIN_ID}/latest`, {
       headers: { 'X-Master-Key': BIN_KEY }
     });
@@ -287,7 +254,7 @@ async function cloudAddShift(newRecord) {
       if (!Array.isArray(latestData.shifts)) latestData.shifts = [];
     }
 
-    // STEP 2: Check if this code already submitted today (prevent duplicates)
+    // 2. Check for duplicates
     const today = todayStr();
     const alreadyExists = latestData.shifts.some(
       s => s.code === newRecord.code && s.submittedAt && s.submittedAt.startsWith(today)
@@ -298,11 +265,10 @@ async function cloudAddShift(newRecord) {
       return 'duplicate';
     }
 
-    // STEP 3: Add the new record to existing array (MERGE not replace)
+    // 3. Merge and Write back
     latestData.shifts.push(newRecord);
-    cloudData = latestData; // update local copy
+    cloudData = latestData; 
 
-    // STEP 4: Write merged data back
     const writeResp = await fetch(`${BASE}/b/${BIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': BIN_KEY },
@@ -313,11 +279,9 @@ async function cloudAddShift(newRecord) {
   } catch (e) { console.error('cloudAddShift:', e); setSyncBadge('err'); return false; }
 }
 
-// Write full cloudData to cloud (used for reset/day-complete)
 async function cloudWrite() {
   setSyncBadge('ing');
   try {
-    const ok = await ensureBin(); if (!ok) { setSyncBadge('err'); return false; }
     const r = await fetch(`${BASE}/b/${BIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': BIN_KEY },
@@ -367,7 +331,7 @@ const SHIFTS = [
 ];
 
 // ══════════════════════════════════════════
-// STATE — images stored in localStorage NOT cloud (too big)
+// STATE & SESSION
 // ══════════════════════════════════════════
 const SKEY = 'os_sess9';
 let ST = {step:'login',emp:null,shift:null,selTasks:[],customTasks:[],imgs:[],modal:null,pdfData:null};
@@ -379,10 +343,8 @@ function saveSess() {
     emp:ST.emp, step:ST.step, shift:ST.shift,
     selTasks:ST.selTasks, customTasks:ST.customTasks
   }));
-  // Save imgs separately in localStorage (not sessionStorage — persists across tabs)
   try { localStorage.setItem('os_imgs_cur', JSON.stringify(ST.imgs)); } catch(e) {}
 }
-// Restore imgs
 if (ST.step !== 'login') {
   try { ST.imgs = JSON.parse(localStorage.getItem('os_imgs_cur') || '[]'); } catch(e) {}
 }
@@ -434,7 +396,6 @@ document.addEventListener('click', e => {
   (actions[a] || Function)();
 }, true);
 
-// ── CLOCK ──
 function tick() {
   const el = document.getElementById('clock');
   if (el) {
@@ -502,9 +463,6 @@ function buildBar() {
   return b;
 }
 
-// ══════════════════════════════════════════
-// LOGIN
-// ══════════════════════════════════════════
 function buildLogin() {
   const today = getTodayShifts();
   const now = new Date().toTimeString().slice(0,5);
@@ -563,9 +521,6 @@ async function doLogin() {
   ST.step = 'shift'; saveSess(); sndOk(); render();
 }
 
-// ══════════════════════════════════════════
-// SHIFT
-// ══════════════════════════════════════════
 function buildShift() {
   const w = document.createElement('div');
   w.innerHTML = `
@@ -592,9 +547,6 @@ function doShift() {
   ST.step = 'tasks'; saveSess(); render();
 }
 
-// ══════════════════════════════════════════
-// TASKS
-// ══════════════════════════════════════════
 function buildTasks() {
   const done = doneIds();
   const all = [...ALL_TASKS.map(t=>({...t,c:false})), ...ST.customTasks];
@@ -648,9 +600,6 @@ function doTasks() {
   ST.step = 'photos'; saveSess(); render();
 }
 
-// ══════════════════════════════════════════
-// PHOTOS — stored locally, NOT in cloud (free tier limit)
-// ══════════════════════════════════════════
 function buildPhotos() {
   const thumbs = ST.imgs.map((s,i) => `<div class="img-thumb"><img src="${s}"><button class="img-del" data-action="delImg" data-idx="${i}">✕</button></div>`).join('');
   const w = document.createElement('div');
@@ -697,29 +646,23 @@ window.addImgs = function(e) {
   if (files.length > rem) toast(`Max 10 photos — ${files.length-rem} skipped`,'error');
 };
 
-// ══════════════════════════════════════════
-// SUBMIT — uses cloudAddShift (merge, not replace)
-// ══════════════════════════════════════════
 async function doSubmit() {
   const btn = document.querySelector('[data-action="doSubmit"]');
   if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
 
   const submittedAt = new Date().toISOString();
-
-  // ── IMAGES: save to localStorage ONLY — never sent to cloud (too large) ──
   const imgKey = 'os_imgs_' + ST.emp.code + '_' + todayStr();
   if (ST.imgs.length) {
     try { localStorage.setItem(imgKey, JSON.stringify(ST.imgs)); }
     catch(e) { console.warn('img local save err', e); }
   }
 
-  // ── CLOUD RECORD: text data only, no images ──
   const rec = {
     name: ST.emp.name, code: ST.emp.code,
     shiftStart: ST.emp.shiftStart, shiftEnd: ST.emp.shiftEnd, hrs: ST.emp.hrs,
     shift: ST.shift, tasks: ST.selTasks.slice(),
-    imgCount: ST.imgs.length, // just store the count, not the actual images
-    imgs: [], // empty — images stored locally per device
+    imgCount: ST.imgs.length, 
+    imgs: [], 
     submittedAt
   };
 
@@ -737,9 +680,6 @@ async function doSubmit() {
   sndChime(); ST.step = 'done'; saveSess(); render();
 }
 
-// ══════════════════════════════════════════
-// DONE
-// ══════════════════════════════════════════
 function buildDone() {
   const today = getTodayShifts();
   const w = document.createElement('div');
@@ -773,9 +713,6 @@ function nextEmp() {
   cloudRead().then(() => { render(); toast('Ready for next employee','success'); });
 }
 
-// ══════════════════════════════════════════
-// MODALS
-// ══════════════════════════════════════════
 function openModal(t) { ST.modal = t; render(); }
 function closeModal() { ST.modal = null; render(); }
 
@@ -841,7 +778,6 @@ function renderModal() {
   document.body.appendChild(bg);
 }
 
-// ── DAY AUTH ──
 async function doDayAuth() {
   const u = document.getElementById('du')?.value?.trim();
   const p = document.getElementById('dp')?.value?.trim();
@@ -854,7 +790,6 @@ async function doDayAuth() {
   const btn = document.querySelector('[data-action="doDayAuth"]');
   if (btn) { btn.textContent = 'Fetching from cloud…'; btn.disabled = true; }
   await cloudRead();
-  // Rehydrate images from localStorage for preview too
   let previewData = getTodayShifts().map(r => {
     const imgKey = 'os_imgs_' + r.code + '_' + todayStr();
     try {
@@ -867,7 +802,6 @@ async function doDayAuth() {
   ST.modal = 'dayPreview'; sndOk(); render();
 }
 
-// ── PREVIEW ──
 function buildPreview() {
   const recs = ST.pdfData || [], now = new Date();
   let secs = '';
@@ -909,16 +843,11 @@ function buildPreview() {
   </div>`;
 }
 
-// ══════════════════════════════════════════
-// PDF GENERATOR — fixed color API
-// ══════════════════════════════════════════
 function generatePDF(recs, now) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm',format:'a4'});
   const pw=210, ml=14, cw=182;
   let y = 0;
-
-  // Header
   doc.setFillColor(45,74,62); doc.rect(0,0,pw,22,'F');
   doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont('helvetica','bold');
   doc.text('OneStop',ml,13);
@@ -927,30 +856,21 @@ function generatePDF(recs, now) {
   doc.setFontSize(8);
   doc.text(now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),pw-ml,13,{align:'right'});
   doc.text(`${recs.length} staff member${recs.length!==1?'s':''}`,pw-ml,18,{align:'right'});
-
-  // Stripe
   doc.setFillColor(168,197,187); doc.rect(0,22,pw*.33,2,'F');
   doc.setFillColor(155,126,70);  doc.rect(pw*.33,22,pw*.33,2,'F');
   doc.setFillColor(197,168,136); doc.rect(pw*.66,22,pw*.34,2,'F');
   y = 30;
-
-  // Period bar
   doc.setFillColor(242,241,238); doc.roundedRect(ml,y,cw,8,1,1,'F');
   doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(138,135,132);
   doc.text(`DATE: ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}  ·  ${recs.length} EMPLOYEES`,ml+3,y+5.2);
   y += 14;
-
   recs.forEach((r,i) => {
     if (y > 250) { doc.addPage(); y = 14; }
-
-    // Employee header
     doc.setFillColor(235,242,239); doc.roundedRect(ml,y,cw,8,1,1,'F');
     doc.setDrawColor(45,74,62); doc.setLineWidth(.6); doc.line(ml,y,ml,y+8);
     doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(45,74,62);
     doc.text(`Employee ${i+1} of ${recs.length}: ${r.name}`,ml+4,y+5.3);
     y += 12;
-
-    // Meta grid
     const meta = [['NAME',r.name],['CODE',r.code],['SHIFT',r.shift],['HOURS',r.hrs+'h'],['IN',r.shiftStart],['OUT',r.shiftEnd||'—']];
     doc.setFillColor(247,247,245); doc.roundedRect(ml,y,cw,22,1,1,'F');
     doc.setDrawColor(232,231,227); doc.setLineWidth(.3); doc.roundedRect(ml,y,cw,22,1,1,'S');
@@ -963,8 +883,6 @@ function generatePDF(recs, now) {
       doc.text(String(m[1]), col, row+4.2);
     });
     y += 26;
-
-    // Tasks
     doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(138,135,132);
     doc.text(`TASKS (${r.tasks.length})`,ml,y);
     doc.setDrawColor(232,231,227); doc.setLineWidth(.3); doc.line(ml+22,y-.5,ml+cw,y-.5);
@@ -985,8 +903,6 @@ function generatePDF(recs, now) {
       doc.setFontSize(8); doc.setFont('helvetica','italic'); doc.setTextColor(180,178,175);
       doc.text('No tasks recorded',ml,y+4); y+=8;
     }
-
-    // Photos
     if (r.imgs && r.imgs.length) {
       if (y > 240) { doc.addPage(); y=14; }
       y += 2;
@@ -1013,70 +929,50 @@ function generatePDF(recs, now) {
       }
       y += Math.ceil(r.imgs.length/perRow)*(imgH+gap)+2;
     }
-
     if (i < recs.length-1) {
       y += 4;
       if (y > 260) { doc.addPage(); y=14; }
       else { doc.setDrawColor(232,231,227); doc.setLineWidth(.4); doc.line(ml,y,ml+cw,y); y+=8; }
     }
   });
-
-  // Footer
   doc.setFillColor(45,74,62); doc.rect(0,289,pw,8,'F');
   doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(170,200,190);
   doc.text('ONESTOP SHIFT MANAGEMENT  ·  CONFIDENTIAL  ·  '+now.toLocaleString('en-GB'), pw/2, 294, {align:'center'});
   return doc;
 }
 
-// ══════════════════════════════════════════
-// SEND PDF + EMAIL
-// ══════════════════════════════════════════
 async function doSend() {
   const recs = ST.pdfData || [];
   if (!recs.length) { toast('No shift data to send','error'); return; }
   const now = new Date();
   ST.modal = 'sending'; render();
-
   function setStat(t, p) {
     const el = document.getElementById('sstat'); if (el) el.textContent = t;
     const bar = document.getElementById('sbar'); if (bar) bar.style.width = p+'%';
   }
-
   setStat('Fetching latest from cloud…', 15);
   await cloudRead();
   let fresh = getTodayShifts();
-
-  // Rehydrate images from localStorage for each employee
-  // Each device stores its own employee's images locally
   fresh = fresh.map(r => {
     const imgKey = 'os_imgs_' + r.code + '_' + todayStr();
     try {
       const stored = localStorage.getItem(imgKey);
-      if (stored) {
-        const imgs = JSON.parse(stored);
-        return {...r, imgs};
-      }
+      if (stored) return {...r, imgs: JSON.parse(stored)};
     } catch(e) {}
-    return r; // imgs stays [] if not on this device
+    return r;
   });
-
   ST.pdfData = fresh;
-
   setStat(`Building PDF for ${fresh.length} employee${fresh.length!==1?'s':''}…`, 40);
   await new Promise(r => setTimeout(r, 300));
-
   try {
     const doc = generatePDF(fresh, now);
     const dateStr = now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
     const fname = `OneStop_Shift_Report_${dateStr}.pdf`;
-
     setStat('Downloading PDF…', 70);
     await new Promise(r => setTimeout(r, 300));
     doc.save(fname);
-
     setStat('Opening mail app…', 88);
     await new Promise(r => setTimeout(r, 700));
-
     const subject = encodeURIComponent(`OneStop Shift Report — ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`);
     const bodyLines = [
       'OneStop Shift Report',
@@ -1100,15 +996,12 @@ async function doSend() {
       '',
       'OneStop Shift Management · Confidential',
     ].join('\n');
-
-    // Use anchor click (most reliable cross-browser mailto trigger)
     const mailLink = document.createElement('a');
     mailLink.style.display = 'none';
     mailLink.href = `mailto:aktrilok1015@gmail.com?subject=${subject}&body=${encodeURIComponent(bodyLines)}`;
     document.body.appendChild(mailLink);
     mailLink.click();
     document.body.removeChild(mailLink);
-
     setStat('Done ✓', 100);
     await new Promise(r => setTimeout(r, 400));
     sndChime(); ST.modal = 'sent'; render();
@@ -1120,11 +1013,7 @@ async function doSend() {
   }
 }
 
-// ══════════════════════════════════════════
-// RESETS
-// ══════════════════════════════════════════
 function clearLocalImgs() {
-  // Remove all os_imgs_ keys from localStorage
   Object.keys(localStorage)
     .filter(k => k.startsWith('os_imgs_'))
     .forEach(k => localStorage.removeItem(k));
@@ -1162,6 +1051,16 @@ async function doResetApp() {
 }
 
 render();
+
+// ══════════════════════════════════════════
+// AUTO-REFRESH: Update the login screen list every 30 seconds
+// ══════════════════════════════════════════
+setInterval(async () => {
+  if (ST.step === 'login') {
+    await cloudRead();
+    render();
+  }
+}, 30000); 
 </script>
 </body>
 </html>
